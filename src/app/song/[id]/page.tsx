@@ -24,15 +24,24 @@ export default async function SongPage({
 
   if (!song) notFound();
 
-  // Get a signed URL for the original audio
-  const { data: signedUrl } = await supabase.storage
+  // Get signed URLs for audio files
+  const { data: originalUrl } = await supabase.storage
     .from("choreosync")
     .createSignedUrl(song.storage_path, 3600);
+
+  let cutUrl: { signedUrl: string } | null = null;
+  if (song.cut_storage_path) {
+    const { data } = await supabase.storage
+      .from("choreosync")
+      .createSignedUrl(song.cut_storage_path, 3600);
+    cutUrl = data;
+  }
 
   return (
     <SongClient
       song={song as Song}
-      audioUrl={signedUrl?.signedUrl || null}
+      audioUrl={originalUrl?.signedUrl || null}
+      cutAudioUrl={cutUrl?.signedUrl || null}
     />
   );
 }

@@ -1,0 +1,8 @@
+modal
+allin1
+librosa
+pydub
+pyrubberband
+numpy
+soundfile
+supabase
