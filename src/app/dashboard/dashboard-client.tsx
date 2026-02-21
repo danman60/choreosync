@@ -13,8 +13,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
-import { Plus, Music, FolderOpen, LogOut } from "lucide-react";
+import { Plus, Music, FolderOpen, LogOut, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import type { Project } from "@/lib/types";
 
@@ -28,6 +34,8 @@ export function DashboardClient({ projects, songCounts, userEmail }: Props) {
   const [newProjectName, setNewProjectName] = useState("");
   const [creating, setCreating] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [renameDialog, setRenameDialog] = useState<{ id: string; name: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -54,6 +62,40 @@ export function DashboardClient({ projects, songCounts, userEmail }: Props) {
     setCreating(false);
   }
 
+  async function renameProject(e: React.FormEvent) {
+    e.preventDefault();
+    if (!renameDialog || !renameDialog.name.trim()) return;
+
+    await supabase
+      .from("cs_projects")
+      .update({ name: renameDialog.name.trim() })
+      .eq("id", renameDialog.id);
+
+    setRenameDialog(null);
+    router.refresh();
+  }
+
+  async function deleteProject(id: string) {
+    // Songs will cascade-delete in DB, but we should also clean storage
+    const { data: songs } = await supabase
+      .from("cs_songs")
+      .select("storage_path, cut_storage_path")
+      .eq("project_id", id);
+
+    if (songs && songs.length > 0) {
+      const paths = songs
+        .flatMap((s) => [s.storage_path, s.cut_storage_path])
+        .filter(Boolean) as string[];
+      if (paths.length > 0) {
+        await supabase.storage.from("choreosync").remove(paths);
+      }
+    }
+
+    await supabase.from("cs_projects").delete().eq("id", id);
+    setDeleteConfirm(null);
+    router.refresh();
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut();
     router.push("/");
@@ -70,7 +112,7 @@ export function DashboardClient({ projects, songCounts, userEmail }: Props) {
             </span>
           </Link>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-500">{userEmail}</span>
+            <span className="text-sm text-gray-500 hidden sm:inline">{userEmail}</span>
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="h-4 w-4" />
             </Button>
@@ -128,9 +170,12 @@ export function DashboardClient({ projects, songCounts, userEmail }: Props) {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
-              <Link key={project.id} href={`/project/${project.id}`}>
-                <Card className="hover:border-violet-300 hover:shadow-md transition-all cursor-pointer h-full">
-                  <CardHeader className="pb-2">
+              <Card
+                key={project.id}
+                className="hover:border-violet-300 hover:shadow-md transition-all h-full relative group"
+              >
+                <Link href={`/project/${project.id}`} className="block">
+                  <CardHeader className="pb-2 pr-10">
                     <CardTitle className="text-base">{project.name}</CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -143,12 +188,95 @@ export function DashboardClient({ projects, songCounts, userEmail }: Props) {
                       {new Date(project.created_at).toLocaleDateString()}
                     </p>
                   </CardContent>
-                </Card>
-              </Link>
+                </Link>
+
+                {/* Context menu */}
+                <div className="absolute top-3 right-3">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.preventDefault()}
+                      >
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setRenameDialog({ id: project.id, name: project.name });
+                        }}
+                      >
+                        <Pencil className="mr-2 h-3.5 w-3.5" />
+                        Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-red-600"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setDeleteConfirm(project.id);
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-3.5 w-3.5" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </Card>
             ))}
           </div>
         )}
       </main>
+
+      {/* Rename dialog */}
+      <Dialog open={!!renameDialog} onOpenChange={(open) => !open && setRenameDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Project</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={renameProject} className="space-y-4">
+            <Input
+              value={renameDialog?.name || ""}
+              onChange={(e) =>
+                setRenameDialog((prev) => prev ? { ...prev, name: e.target.value } : null)
+              }
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button type="submit" disabled={!renameDialog?.name.trim()}>
+                Save
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setRenameDialog(null)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm dialog */}
+      <Dialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Project</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600">
+            This will permanently delete the project and all its songs. This cannot be undone.
+          </p>
+          <div className="flex gap-2 mt-4">
+            <Button variant="destructive" onClick={() => deleteConfirm && deleteProject(deleteConfirm)}>
+              Delete
+            </Button>
+            <Button variant="ghost" onClick={() => setDeleteConfirm(null)}>
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

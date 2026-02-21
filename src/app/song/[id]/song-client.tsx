@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -148,9 +149,22 @@ export function SongClient({ song: initialSong, audioUrl, cutAudioUrl }: Props) 
     }
   }
 
+  const [customMinutes, setCustomMinutes] = useState(
+    song.routine_type === "custom" && song.target_duration_ms
+      ? Math.floor(song.target_duration_ms / 60000)
+      : 2
+  );
+  const [customSeconds, setCustomSeconds] = useState(
+    song.routine_type === "custom" && song.target_duration_ms
+      ? Math.round((song.target_duration_ms % 60000) / 1000)
+      : 30
+  );
+
   async function updateRoutineType(routineType: RoutineType) {
     const targetMs =
-      routineType === "custom" ? song.target_duration_ms : ROUTINE_DURATIONS[routineType];
+      routineType === "custom"
+        ? (customMinutes * 60 + customSeconds) * 1000
+        : ROUTINE_DURATIONS[routineType];
 
     await supabase
       .from("cs_songs")
@@ -162,6 +176,15 @@ export function SongClient({ song: initialSong, audioUrl, cutAudioUrl }: Props) 
       routine_type: routineType,
       target_duration_ms: targetMs,
     }));
+  }
+
+  async function updateCustomDuration() {
+    const targetMs = (customMinutes * 60 + customSeconds) * 1000;
+    await supabase
+      .from("cs_songs")
+      .update({ target_duration_ms: targetMs })
+      .eq("id", song.id);
+    setSong((s) => ({ ...s, target_duration_ms: targetMs }));
   }
 
   function handleTagChange(sectionName: string, tag: SectionTag | null) {
@@ -212,7 +235,7 @@ export function SongClient({ song: initialSong, audioUrl, cutAudioUrl }: Props) 
 
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
         {/* Song header */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
               {song.original_filename}
@@ -249,21 +272,46 @@ export function SongClient({ song: initialSong, audioUrl, cutAudioUrl }: Props) 
             </div>
           </div>
 
-          <Select
-            value={song.routine_type || ""}
-            onValueChange={(v) => updateRoutineType(v as RoutineType)}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Routine type" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(ROUTINE_LABELS).map(([key, label]) => (
-                <SelectItem key={key} value={key}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select
+              value={song.routine_type || ""}
+              onValueChange={(v) => updateRoutineType(v as RoutineType)}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Routine type" />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(ROUTINE_LABELS).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {song.routine_type === "custom" && (
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  min={0}
+                  max={10}
+                  value={customMinutes}
+                  onChange={(e) => setCustomMinutes(Number(e.target.value))}
+                  onBlur={updateCustomDuration}
+                  className="w-16 text-center"
+                />
+                <span className="text-sm text-gray-500">:</span>
+                <Input
+                  type="number"
+                  min={0}
+                  max={59}
+                  value={customSeconds}
+                  onChange={(e) => setCustomSeconds(Number(e.target.value))}
+                  onBlur={updateCustomDuration}
+                  className="w-16 text-center"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {error && (

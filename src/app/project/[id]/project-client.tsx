@@ -191,7 +191,7 @@ export function ProjectClient({ project, songs, userId }: Props) {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
             <p className="text-sm text-gray-500">
@@ -200,17 +200,17 @@ export function ProjectClient({ project, songs, userId }: Props) {
                 ` / ${cutsReady.length} cut${cutsReady.length !== 1 ? "s" : ""} ready`}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {pendingAnalysis.length > 0 && (
-              <Button variant="outline" onClick={analyzeAll}>
+              <Button variant="outline" size="sm" onClick={analyzeAll}>
                 <Wand2 className="mr-2 h-4 w-4" />
                 Analyze All ({pendingAnalysis.length})
               </Button>
             )}
             {cutsReady.length > 0 && (
-              <Button variant="outline" onClick={downloadAllCuts}>
+              <Button variant="outline" size="sm" onClick={downloadAllCuts}>
                 <Download className="mr-2 h-4 w-4" />
-                Download All Cuts
+                Download All
               </Button>
             )}
             <label>
@@ -222,10 +222,10 @@ export function ProjectClient({ project, songs, userId }: Props) {
                 onChange={(e) => handleUpload(e.target.files)}
                 disabled={uploading}
               />
-              <Button asChild disabled={uploading}>
+              <Button asChild size="sm" disabled={uploading}>
                 <span>
                   <Upload className="mr-2 h-4 w-4" />
-                  {uploading ? "Uploading..." : "Upload Songs"}
+                  {uploading ? "Uploading..." : "Upload"}
                 </span>
               </Button>
             </label>
@@ -291,23 +291,25 @@ export function ProjectClient({ project, songs, userId }: Props) {
                     </div>
                   </div>
 
-                  <Select
-                    value={song.routine_type || ""}
-                    onValueChange={(v) =>
-                      updateRoutineType(song.id, v as RoutineType)
-                    }
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue placeholder="Routine type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(ROUTINE_LABELS).map(([key, label]) => (
-                        <SelectItem key={key} value={key}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="hidden sm:block">
+                    <Select
+                      value={song.routine_type || ""}
+                      onValueChange={(v) =>
+                        updateRoutineType(song.id, v as RoutineType)
+                      }
+                    >
+                      <SelectTrigger className="w-44">
+                        <SelectValue placeholder="Routine type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(ROUTINE_LABELS).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <div className="flex gap-1">
                     {song.cut_status === "ready" && (
